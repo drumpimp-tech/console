@@ -178,6 +178,12 @@
 </div>
 
 <script>
+const PROXY = 'https://trevbeats-proxy.trevbeatsmultimedia.workers.dev';
+
+function proxied(url) {
+  return PROXY + '?url=' + encodeURIComponent(url);
+}
+
 const APPS = [
   { id:'between',    name:'BETWEEN',       icon:'⚡', color:'#00E5FF',
     firebase:'between-backend-decd6',
@@ -302,7 +308,7 @@ function updateSummary() {
 async function checkFirebase(projectID) {
   const start = Date.now();
   try {
-    const r = await fetch(`https://${projectID}.firebaseio.com/.json?shallow=true`, {signal: AbortSignal.timeout(10000)});
+    const r = await fetch(proxied(`https://${projectID}.web.app`), {signal: AbortSignal.timeout(10000)});
     const ms = Date.now()-start;
     if ([200,401].includes(r.status)) return {label:`Firebase (${projectID})`,status:'ok',detail:`HTTP ${r.status}`,latencyMs:ms};
     if (r.status===404) return {label:`Firebase (${projectID})`,status:'fail',detail:'Project not found',latencyMs:ms};
@@ -314,7 +320,7 @@ async function checkEndpoint(url) {
   const host = new URL(url).hostname;
   const start = Date.now();
   try {
-    const r = await fetch(url, {
+    const r = await fetch(proxied(url), {
       method:'POST', signal: AbortSignal.timeout(10000),
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ping:true})
@@ -330,8 +336,7 @@ async function checkRevenueCat(key) {
   if (!key) return null;
   const start = Date.now();
   try {
-    const r = await fetch('https://api.revenuecat.com/v1/subscribers/$RCAnonymousID:check', {
-      headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+    const r = await fetch(proxied('https://api.revenuecat.com/health'), {
       signal: AbortSignal.timeout(10000)
     });
     const ms = Date.now()-start;
@@ -345,7 +350,7 @@ async function checkAppStore(appID) {
   if (!appID) return null;
   const start = Date.now();
   try {
-    const r = await fetch(`https://itunes.apple.com/lookup?id=${appID}`, {signal: AbortSignal.timeout(10000)});
+    const r = await fetch(proxied(`https://itunes.apple.com/lookup?id=${appID}`), {signal: AbortSignal.timeout(10000)});
     const ms = Date.now()-start;
     if (r.status===200) {
       const data = await r.json();
@@ -362,7 +367,7 @@ async function checkAppStore(appID) {
 async function checkAnthropicReachable() {
   const start = Date.now();
   try {
-    const r = await fetch('https://api.anthropic.com/v1/models', {
+    const r = await fetch(proxied('https://api.anthropic.com/v1/models'), {
       headers:{'anthropic-version':'2023-06-01'},
       signal: AbortSignal.timeout(10000)
     });
@@ -376,7 +381,7 @@ async function checkAnthropicReachable() {
 async function checkGeminiReachable() {
   const start = Date.now();
   try {
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {signal: AbortSignal.timeout(10000)});
+    const r = await fetch(proxied('https://generativelanguage.googleapis.com/v1beta/models'), {signal: AbortSignal.timeout(10000)});
     const ms = Date.now()-start;
     if ([200,400,401,403].includes(r.status)) return {label:'Gemini API',status:'ok',detail:'Reachable',latencyMs:ms};
     return {label:'Gemini API',status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
@@ -386,7 +391,7 @@ async function checkGeminiReachable() {
 async function checkPerplexityReachable() {
   const start = Date.now();
   try {
-    const r = await fetch('https://api.perplexity.ai/chat/completions', {
+    const r = await fetch(proxied('https://api.perplexity.ai/chat/completions'), {
       method:'POST', signal: AbortSignal.timeout(10000),
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({model:'sonar',messages:[{role:'user',content:'ping'}]})
