@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrevBeats Multimedia Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #080808; --card: #0e0e0e; --border: #1e1e1e;
+    --ok: #00FFC6; --warn: #FF9A3C; --fail: #FF4FA3;
+    --checking: #FFD600; --idle: #333;
+    --text: #fff; --muted: #666; --faint: #333;
+  }
+  html { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; }
+  body { min-height: 100vh; overflow-x: hidden; }
+
+  /* Scanline */
+  body::after {
+    content: ''; position: fixed; top: -100px; left: 0; right: 0; height: 100px;
+    background: linear-gradient(transparent, rgba(0,255,198,0.025), transparent);
+    animation: scanline 10s linear infinite; pointer-events: none; z-index: 0;
+  }
+  @keyframes scanline { to { top: 100vh; } }
+
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px; position: relative; z-index: 1; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid #141414; margin-bottom: 20px; }
+  .header-left {}
+  .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .brand-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.2)} }
+  .brand-name { font-size: 10px; color: var(--ok); letter-spacing: .15em; }
+  h1 { font-family: 'Space Mono', monospace; font-size: 26px; font-weight: 700; letter-spacing: .04em; }
+  .last-run { font-size: 9px; color: var(--faint); margin-top: 4px; letter-spacing: .08em; }
+  .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn { font-family: 'DM Mono', monospace; font-size: 11px; padding: 8px 14px; border-radius: 8px; cursor: pointer; letter-spacing: .06em; border: none; transition: all .2s; }
+  .btn-ghost { background: transparent; border: 1px solid #222; color: var(--muted); }
+  .btn-ghost:hover { border-color: #444; color: #aaa; }
+  .btn-primary { background: var(--ok); color: #000; font-family: 'Space Mono', monospace; font-weight: 700; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:disabled { background: transparent; border: 1px solid #00FFC622; color: #00FFC644; cursor: not-allowed; }
+
+  /* Summary */
+  .summary { display: flex; align-items: center; gap: 0; background: #0a0a0a; border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 4px; }
+  .summary-label { font-size: 10px; color: #444; letter-spacing: .08em; margin-right: 10px; }
+  .stat { display: flex; align-items: center; gap: 5px; }
+  .stat-val { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; }
+  .stat-label { font-size: 9px; color: #444; }
+  .divider { width: 1px; height: 20px; background: #1e1e1e; margin: 0 10px; }
+  .running-badge { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 9px; color: var(--checking); animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .running-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--checking); }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+  /* Card */
+  .card { background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); transition: border-color .2s; }
+  .card-bar { height: 2px; }
+  .card-body { padding: 14px; }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .card-title-group { display: flex; align-items: center; gap: 10px; }
+  .card-icon { font-size: 22px; }
+  .card-name { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #fff; }
+  .card-sub { font-size: 9px; color: #444; margin-top: 2px; }
+  .card-status { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .checking-label { font-size: 8px; color: var(--checking); animation: blink 1s step-end infinite; }
+
+  /* Check rows */
+  .checks { }
+  .check-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #1a1a1a; }
+  .check-label { font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+  .check-right { display: flex; align-items: center; gap: 8px; }
+  .latency { font-size: 9px; color: #444; }
+  .check-badge { display: flex; align-items: center; gap: 4px; }
+  .check-badge-text { font-size: 10px; font-weight: 500; }
+
+  /* Status dot */
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot-lg { width: 10px; height: 10px; }
+  .dot-ok { background: var(--ok); }
+  .dot-warn { background: var(--warn); }
+  .dot-fail { background: var(--fail); animation: glowfail 1s ease-in-out infinite; }
+  .dot-checking { background: var(--checking); animation: pulse 1s ease-in-out infinite; }
+  .dot-idle { background: var(--idle); }
+  @keyframes glowfail { 0%,100%{box-shadow:0 0 4px var(--fail)} 50%{box-shadow:0 0 10px var(--fail)} }
+
+  .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .card-time { font-size: 9px; color: #333; }
+  .recheck-btn { font-size: 9px; color: #555; background: none; border: none; cursor: pointer; font-family: 'DM Mono', monospace; transition: color .2s; }
+  .recheck-btn:hover { color: #aaa; }
+
+  .not-checked { font-size: 11px; color: #333; text-align: center; padding: 10px 0; }
+
+  /* Footer */
+  .footer { text-align: center; font-size: 9px; color: #222; letter-spacing: .1em; margin-top: 32px; padding-bottom: 24px; }
+
+  /* Alert modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal { background: #0e0e0e; border: 1px solid #2a2a2a; border-radius: 14px; padding: 28px; width: 360px; max-width: 100%; }
+  .modal-title { font-family: 'Space Mono', monospace; font-size: 15px; margin-bottom: 4px; }
+  .modal-sub { font-size: 11px; color: #555; margin-bottom: 24px; }
+  .modal-section { font-size: 10px; color: #555; letter-spacing: .1em; margin-bottom: 10px; margin-top: 16px; }
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #1a1a1a; }
+  .toggle-label { font-size: 12px; color: #ccc; }
+  input[type=checkbox] { accent-color: var(--ok); width: 16px; height: 16px; cursor: pointer; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-cancel { flex: 1; background: transparent; border: 1px solid #2a2a2a; color: #666; border-radius: 8px; padding: 10px; font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; }
+  .modal-save { flex: 2; background: var(--ok); border: none; color: #000; border-radius: 8px; padding: 10px; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .2s; }
+  .modal-save.saved { background: transparent; border: 1px solid var(--ok); color: var(--ok); }
+  .hidden { display: none !important; }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 20px; }
+    .header { flex-direction: column; gap: 14px; }
+    .header-actions { width: 100%; }
+    .btn { flex: 1; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="brand">
+        <div class="brand-dot" id="headerDot"></div>
+        <span class="brand-name">TREVBEATS MULTIMEDIA</span>
+      </div>
+      <h1>CONSOLE</h1>
+      <div class="last-run" id="lastRun">NOT YET RUN</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost" onclick="openAlerts()">🔔 ALERTS</button>
+      <button class="btn btn-primary" id="runBtn" onclick="runAllChecks()">▶ RUN CHECKS</button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <span class="summary-label">STATUS</span>
+    <div class="stat"><span class="stat-val" id="statOk" style="color:var(--ok)">0</span><span class="stat-label">OK</span></div>
+    <div class="divider"></div>
+    <div class="stat"><span class="stat-val" id="statWarn" style="color:var(--warn)">0</span><span class="stat-label">WARN</span></div>
+    <div class="divider"></div>
+    <div class="stat"><span class="stat-val" id="statFail" style="color:var(--fail)">0</span><span class="stat-label">FAIL</span></div>
+    <div class="divider"></div>
+    <div class="stat"><span class="stat-val" id="statTotal" style="color:#555">8</span><span class="stat-label">TOTAL</span></div>
+    <div class="running-badge hidden" id="runningBadge"><div class="running-dot"></div>RUNNING CHECKS</div>
+  </div>
+
+  <!-- Grid -->
+  <div class="grid" id="grid"></div>
+
+  <div class="footer" id="footer">TREVBEATS MULTIMEDIA CONSOLE · 8 APPS MONITORED</div>
+</div>
+
+<!-- Alert Modal -->
+<div class="modal-backdrop hidden" id="alertModal" onclick="closeAlerts(event)">
+  <div class="modal">
+    <div class="modal-title">Alert Settings</div>
+    <div class="modal-sub">Push & email notifications</div>
+    <div class="modal-section">NOTIFY ME WHEN</div>
+    <div class="toggle-row"><span class="toggle-label">Any app fails a check</span><input type="checkbox" checked id="chkFail"></div>
+    <div class="toggle-row"><span class="toggle-label">Check returns WARN</span><input type="checkbox" checked id="chkWarn"></div>
+    <div class="toggle-row"><span class="toggle-label">API key returns error</span><input type="checkbox" checked id="chkAPI"></div>
+    <div class="toggle-row"><span class="toggle-label">RevenueCat unreachable</span><input type="checkbox" checked id="chkRC"></div>
+    <div class="modal-section">ALERT EMAIL</div>
+    <div style="font-size:13px;color:#fff;padding:10px 12px;background:#151515;border:1px solid #2a2a2a;border-radius:8px;font-family:'DM Mono',monospace">trevbeatsmultimedia@gmail.com</div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeAlerts()">Cancel</button>
+      <button class="modal-save" id="saveBtn" onclick="saveAlerts()">SAVE ALERTS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const APPS = [
+  { id:'between',    name:'BETWEEN',       icon:'⚡', color:'#00E5FF',
+    firebase:'between-backend-decd6',
+    endpoints:['https://us-central1-between-backend-decd6.cloudfunctions.net/analyzeRelationship'],
+    apiKeys:['Gemini','Anthropic'], rcKey:'appl_wdeix0YozuFBeqKHWiOEipVdXIa', appStoreID:null },
+  { id:'writetone',  name:'WriteTone',      icon:'✍️', color:'#69FF47',
+    firebase:'writetone-server',
+    endpoints:['https://analyzevoice-wckvunp6fa-uc.a.run.app'],
+    apiKeys:['Anthropic','Perplexity'], rcKey:'appl_dVmWTYKzAVyJKasOQegdvPaxsSj', appStoreID:null },
+  { id:'promptducer',name:'Prompt-Ducer',   icon:'🎛', color:'#FFD600',
+    firebase:'writetone-server',
+    endpoints:['https://us-central1-writetone-server.cloudfunctions.net/generatePrompt'],
+    apiKeys:['Anthropic'], rcKey:'appl_xFxqIyKDpOOtncvTWiyHzoWEUTR', appStoreID:'6757172557' },
+  { id:'maiai',      name:'MAIAI',          icon:'🤖', color:'#FF6B6B',
+    firebase:'writetone-server',
+    endpoints:['https://maiai-proxy.web.app'],
+    apiKeys:['Anthropic'], rcKey:'appl_TgAsqRXyIbRwqIueUzHFvsaJUNj', appStoreID:null },
+  { id:'dshot',      name:'D-Shot',         icon:'🎬', color:'#FF9A3C',
+    firebase:'dshot-server',
+    endpoints:[], apiKeys:[], rcKey:'appl_LYkcpZByvKftBLPBlxXOEKDQOTi', appStoreID:null },
+  { id:'didyou',     name:'DidYou?',        icon:'✅', color:'#B47AEA',
+    firebase:'dshot-server',
+    endpoints:[], apiKeys:[], rcKey:'appl_MDNwSvVmJMOiswGFTuMHCwwPEtJ', appStoreID:null },
+  { id:'vet',        name:'VET',            icon:'🔍', color:'#00FFC6',
+    firebase:'between-backend-decd6',
+    endpoints:[], apiKeys:['Anthropic'], rcKey:null, appStoreID:null },
+  { id:'snarelab',   name:'Snare Lab',      icon:'🥁', color:'#FF4FA3',
+    firebase:'dshot-server',
+    endpoints:[], apiKeys:[], rcKey:null, appStoreID:null },
+];
+
+let state = {};
+APPS.forEach(a => state[a.id] = { status:'idle', checks:[], checkedAt:null, checking:false });
+
+function statusColor(s) {
+  return {ok:'var(--ok)',warn:'var(--warn)',fail:'var(--fail)',checking:'var(--checking)',idle:'var(--idle)'}[s]||'var(--idle)';
+}
+function statusLabel(s) {
+  return {ok:'OK',warn:'WARN',fail:'FAIL',checking:'···',idle:'—'}[s]||'—';
+}
+
+function dotHTML(status, large=false) {
+  const cls = large ? 'dot dot-lg' : 'dot';
+  return `<div class="${cls} dot-${status}"></div>`;
+}
+
+function overallStatus(checks) {
+  if (!checks || checks.length === 0) return 'idle';
+  if (checks.some(c=>c.status==='checking')) return 'checking';
+  if (checks.some(c=>c.status==='fail')) return 'fail';
+  if (checks.some(c=>c.status==='warn')) return 'warn';
+  if (checks.every(c=>c.status==='ok')) return 'ok';
+  return 'idle';
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = APPS.map(app => {
+    const s = state[app.id];
+    const os = s.checking ? 'checking' : overallStatus(s.checks);
+    return `
+    <div class="card" id="card-${app.id}">
+      <div class="card-bar" style="background:${app.color}"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon">${app.icon}</span>
+            <div>
+              <div class="card-name">${app.name}</div>
+              <div class="card-sub">${app.appStoreID ? 'App Store · id'+app.appStoreID : 'Not yet on App Store'}</div>
+            </div>
+          </div>
+          <div class="card-status">
+            ${dotHTML(os, true)}
+            ${s.checking ? '<div class="checking-label">CHECKING</div>' : ''}
+          </div>
+        </div>
+        <div class="checks">
+          ${s.checks.length === 0 && !s.checking ? `<div class="not-checked">Not checked yet</div>` : ''}
+          ${s.checking ? renderLoadingRows(app) : s.checks.map(c => checkRowHTML(c)).join('')}
+        </div>
+        ${s.checkedAt && !s.checking ? `
+        <div class="card-footer">
+          <span class="card-time">${new Date(s.checkedAt).toLocaleTimeString()}</span>
+          <button class="recheck-btn" onclick="recheckApp('${app.id}')">↻ RECHECK</button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  updateSummary();
+}
+
+function checkRowHTML(c) {
+  return `<div class="check-row">
+    <span class="check-label">${c.label}</span>
+    <div class="check-right">
+      ${c.latencyMs ? `<span class="latency">${c.latencyMs}ms</span>` : ''}
+      <div class="check-badge">
+        ${dotHTML(c.status)}
+        <span class="check-badge-text" style="color:${statusColor(c.status)}">${statusLabel(c.status)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderLoadingRows(app) {
+  const labels = ['Firebase', ...app.apiKeys.map(k=>k+' API'), ...app.endpoints.map(()=>'Endpoint'),
+    ...(app.rcKey?['RevenueCat']:[]), ...(app.appStoreID?['App Store']:[])];
+  return labels.slice(0,5).map(l => checkRowHTML({label:l,status:'checking',latencyMs:null})).join('');
+}
+
+function updateSummary() {
+  const statuses = APPS.map(a => overallStatus(state[a.id].checks));
+  document.getElementById('statOk').textContent = statuses.filter(s=>s==='ok').length;
+  document.getElementById('statWarn').textContent = statuses.filter(s=>s==='warn').length;
+  document.getElementById('statFail').textContent = statuses.filter(s=>s==='fail').length;
+  document.getElementById('statTotal').textContent = APPS.length;
+}
+
+// MARK: - Real health checks
+
+async function checkFirebase(projectID) {
+  const start = Date.now();
+  try {
+    const r = await fetch(`https://${projectID}.firebaseio.com/.json?shallow=true`, {signal: AbortSignal.timeout(10000)});
+    const ms = Date.now()-start;
+    if ([200,401].includes(r.status)) return {label:`Firebase (${projectID})`,status:'ok',detail:`HTTP ${r.status}`,latencyMs:ms};
+    if (r.status===404) return {label:`Firebase (${projectID})`,status:'fail',detail:'Project not found',latencyMs:ms};
+    return {label:`Firebase (${projectID})`,status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:`Firebase (${projectID})`,status:'fail',detail:e.message}; }
+}
+
+async function checkEndpoint(url) {
+  const host = new URL(url).hostname;
+  const start = Date.now();
+  try {
+    const r = await fetch(url, {
+      method:'POST', signal: AbortSignal.timeout(10000),
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ping:true})
+    });
+    const ms = Date.now()-start;
+    if ([200,201,400,401,403].includes(r.status)) return {label:`Endpoint: ${host}`,status:'ok',detail:`HTTP ${r.status}`,latencyMs:ms};
+    if (r.status>=500) return {label:`Endpoint: ${host}`,status:'fail',detail:`Server error ${r.status}`,latencyMs:ms};
+    return {label:`Endpoint: ${host}`,status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:`Endpoint: ${host}`,status:'fail',detail:e.message}; }
+}
+
+async function checkRevenueCat(key) {
+  if (!key) return null;
+  const start = Date.now();
+  try {
+    const r = await fetch('https://api.revenuecat.com/v1/subscribers/$RCAnonymousID:check', {
+      headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+      signal: AbortSignal.timeout(10000)
+    });
+    const ms = Date.now()-start;
+    if ([200,404].includes(r.status)) return {label:'RevenueCat',status:'ok',detail:`HTTP ${r.status}`,latencyMs:ms};
+    if (r.status===401) return {label:'RevenueCat',status:'fail',detail:'Invalid API key',latencyMs:ms};
+    return {label:'RevenueCat',status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:'RevenueCat',status:'fail',detail:e.message}; }
+}
+
+async function checkAppStore(appID) {
+  if (!appID) return null;
+  const start = Date.now();
+  try {
+    const r = await fetch(`https://itunes.apple.com/lookup?id=${appID}`, {signal: AbortSignal.timeout(10000)});
+    const ms = Date.now()-start;
+    if (r.status===200) {
+      const data = await r.json();
+      if (data.resultCount > 0) {
+        const app = data.results[0];
+        return {label:'App Store',status:'ok',detail:`v${app.version} · ${app.trackName}`,latencyMs:ms};
+      }
+      return {label:'App Store',status:'warn',detail:'App not found in store',latencyMs:ms};
+    }
+    return {label:'App Store',status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:'App Store',status:'fail',detail:e.message}; }
+}
+
+async function checkAnthropicReachable() {
+  const start = Date.now();
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/models', {
+      headers:{'anthropic-version':'2023-06-01'},
+      signal: AbortSignal.timeout(10000)
+    });
+    const ms = Date.now()-start;
+    if ([200,401].includes(r.status)) return {label:'Anthropic API',status:'ok',detail:'Reachable',latencyMs:ms};
+    if (r.status===529) return {label:'Anthropic API',status:'warn',detail:'Overloaded',latencyMs:ms};
+    return {label:'Anthropic API',status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:'Anthropic API',status:'fail',detail:e.message}; }
+}
+
+async function checkGeminiReachable() {
+  const start = Date.now();
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {signal: AbortSignal.timeout(10000)});
+    const ms = Date.now()-start;
+    if ([200,400,401,403].includes(r.status)) return {label:'Gemini API',status:'ok',detail:'Reachable',latencyMs:ms};
+    return {label:'Gemini API',status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:'Gemini API',status:'fail',detail:e.message}; }
+}
+
+async function checkPerplexityReachable() {
+  const start = Date.now();
+  try {
+    const r = await fetch('https://api.perplexity.ai/chat/completions', {
+      method:'POST', signal: AbortSignal.timeout(10000),
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:'sonar',messages:[{role:'user',content:'ping'}]})
+    });
+    const ms = Date.now()-start;
+    if ([200,401,403].includes(r.status)) return {label:'Perplexity API',status:'ok',detail:'Reachable',latencyMs:ms};
+    return {label:'Perplexity API',status:'warn',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:'Perplexity API',status:'fail',detail:e.message}; }
+}
+
+async function checkSingleApp(app) {
+  state[app.id].checking = true;
+  renderGrid();
+
+  const checks = [];
+
+  // Firebase
+  checks.push(await checkFirebase(app.firebase));
+
+  // API keys
+  for (const key of app.apiKeys) {
+    if (key==='Anthropic') checks.push(await checkAnthropicReachable());
+    else if (key==='Gemini') checks.push(await checkGeminiReachable());
+    else if (key==='Perplexity') checks.push(await checkPerplexityReachable());
+  }
+
+  // Endpoints
+  for (const url of app.endpoints) {
+    checks.push(await checkEndpoint(url));
+  }
+
+  // RevenueCat
+  const rc = await checkRevenueCat(app.rcKey);
+  if (rc) checks.push(rc);
+
+  // App Store
+  const asc = await checkAppStore(app.appStoreID);
+  if (asc) checks.push(asc);
+
+  state[app.id] = { status: overallStatus(checks), checks, checkedAt: Date.now(), checking: false };
+  renderGrid();
+}
+
+async function runAllChecks() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'RUNNING...';
+  document.getElementById('runningBadge').classList.remove('hidden');
+
+  await Promise.all(APPS.map(app => checkSingleApp(app)));
+
+  btn.disabled = false;
+  btn.textContent = '▶ RUN CHECKS';
+  document.getElementById('runningBadge').classList.add('hidden');
+  document.getElementById('lastRun').textContent = 'LAST RUN · ' + new Date().toLocaleTimeString();
+}
+
+async function recheckApp(id) {
+  const app = APPS.find(a=>a.id===id);
+  if (app) await checkSingleApp(app);
+}
+
+// Alert modal
+function openAlerts() { document.getElementById('alertModal').classList.remove('hidden'); }
+function closeAlerts(e) {
+  if (!e || e.target.id==='alertModal') document.getElementById('alertModal').classList.add('hidden');
+}
+function saveAlerts() {
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = '✓ SAVED'; btn.classList.add('saved');
+  setTimeout(() => { document.getElementById('alertModal').classList.add('hidden'); btn.textContent='SAVE ALERTS'; btn.classList.remove('saved'); }, 800);
+}
+
+// Init
+renderGrid();
+</script>
+</body>
+</html>
