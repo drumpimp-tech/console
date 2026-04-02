@@ -148,14 +148,14 @@
     <div class="divider"></div>
     <div class="stat"><span class="stat-val" id="statFail" style="color:var(--fail)">0</span><span class="stat-label">FAIL</span></div>
     <div class="divider"></div>
-    <div class="stat"><span class="stat-val" id="statTotal" style="color:#555">8</span><span class="stat-label">TOTAL</span></div>
+    <div class="stat"><span class="stat-val" id="statTotal" style="color:#555">10</span><span class="stat-label">TOTAL</span></div>
     <div class="running-badge hidden" id="runningBadge"><div class="running-dot"></div>RUNNING CHECKS</div>
   </div>
 
   <!-- Grid -->
   <div class="grid" id="grid"></div>
 
-  <div class="footer" id="footer">TREVBEATS MULTIMEDIA CONSOLE · 8 APPS MONITORED</div>
+  <div class="footer" id="footer">TREVBEATS MULTIMEDIA CONSOLE · 10 APPS MONITORED</div>
 </div>
 
 <!-- Alert Modal -->
@@ -213,6 +213,12 @@ const APPS = [
   { id:'snarelab',   name:'Snare Lab',      icon:'🥁', color:'#FF4FA3',
     firebase:'dshot-server',
     endpoints:[], apiKeys:[], rcKey:null, appStoreID:null },
+  { id:'gatefit',    name:'GateFit',        icon:'💪', color:'#00E5FF',
+    firebase:'', supabase:'https://acfjtnbgssnearcanith.supabase.co',
+    endpoints:[], apiKeys:[], rcKey:null, appStoreID:null },
+  { id:'korners',    name:'KORNERS',        icon:'🏙', color:'#FF6B6B',
+    firebase:'', supabase:'https://xdbdvmclatfjaeuwurkz.supabase.co',
+    endpoints:[], apiKeys:['Anthropic'], rcKey:null, appStoreID:null },
 ];
 
 let state = {};
@@ -316,6 +322,18 @@ async function checkFirebase(projectID) {
   } catch(e) { return {label:`Firebase (${projectID})`,status:'fail',detail:e.message}; }
 }
 
+async function checkSupabase(url) {
+  if (!url) return null;
+  const start = Date.now();
+  try {
+    const r = await fetch(proxied(url + '/rest/v1/'), {signal: AbortSignal.timeout(10000)});
+    const ms = Date.now()-start;
+    if ([200,401].includes(r.status)) return {label:'Supabase',status:'ok',detail:`HTTP ${r.status}`,latencyMs:ms};
+    if (r.status>=500) return {label:'Supabase',status:'fail',detail:`Server error ${r.status}`,latencyMs:ms};
+    return {label:'Supabase',status:'ok',detail:`HTTP ${r.status}`,latencyMs:ms};
+  } catch(e) { return {label:'Supabase',status:'fail',detail:e.message}; }
+}
+
 async function checkEndpoint(url) {
   const host = new URL(url).hostname;
   const start = Date.now();
@@ -408,8 +426,12 @@ async function checkSingleApp(app) {
 
   const checks = [];
 
-  // Firebase
-  checks.push(await checkFirebase(app.firebase));
+  // Firebase or Supabase
+  if (app.supabase) {
+    checks.push(await checkSupabase(app.supabase));
+  } else {
+    checks.push(await checkFirebase(app.firebase));
+  }
 
   // API keys
   for (const key of app.apiKeys) {
